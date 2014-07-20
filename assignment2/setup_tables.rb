@@ -33,4 +33,4 @@ end
 insert_matrix(DB[:a], a)
 insert_matrix(DB[:b], b)
 
-#  select a.row_num, b.col_num, sum(a.value * b.value) from a, b where ((a.row_num = b.col_num OR a.row_num != b.col_num) AND a.col_num = b.row_num) group by a.row_num, b.col_num;
+#  select a.row_num, b.col_num, sum(a.value * b.value) from a, b where (a.col_num = b.row_num) group by a.row_num, b.col_num;
