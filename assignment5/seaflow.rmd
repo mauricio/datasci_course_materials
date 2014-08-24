@@ -1,0 +1,134 @@
+---
+title: "Assignment 5"
+output: html_document
+---
+
+# Setup
+
+This document requires the following packages installed, `caret`, `rpart`, `tree`, `randomForest`, `e1071` and `ggplot`.
+
+```{r loading_libraries}
+library(ggplot2)
+library(rpart)
+library(caret)
+library(randomForest)
+library(e1071)
+```
+
+# Loading and summarizing the data
+
+We start the assignment by loading the SeaFlow data from the `seaflow_21min.csv` file:
+
+```{r seaflowLoad, cache=TRUE}
+seaflow <- read.csv("seaflow_21min.csv")
+```
+
+Let's look at a summary of the data:
+
+```{r summary, cache=TRUE}
+summary(seaflow)
+```
+
+# Creating the test set
+
+Now we create a training set:
+
+```{r partition, echo=FALSE, cache=TRUE}
+samples <- createDataPartition(seaflow$cell_id, 2)
+trainingSet <- seaflow[samples$Resample1,]
+testSet <- seaflow[samples$Resample2,]
+```
+
+Now let's calculate the mean for `time`:
+
+```{r mean_of_time, cache=TRUE}
+mean(trainingSet$time)
+```
+
+# Plotting `pe` against `chl_small`
+
+```{r pe_to_chl_small_plot, cache=TRUE}
+qplot(pe, chl_small, data = seaflow, color=pop)
+```
+
+# Training the decision tree
+
+```{r training_tree, cache=TRUE}
+fol <- formula(pop ~ fsc_small + fsc_perp + fsc_big + pe + chl_big + chl_small)
+model <- rpart(fol, method="class", data=trainingSet)
+print(model)
+```
+
+# Predicting the values with decision trees
+
+```{r predicting_with_decision_trees, cache=TRUE}
+dtPredictions <- predict(model, newdata=testSet, type="class")
+sum(testSet$pop == dtPredictions)
+sum(testSet$pop == dtPredictions)/nrow(testSet)
+```
+
+# Predicting the values with random forests
+
+```{r predicting_with_random_forests, cache=TRUE}
+randomForestModel <- randomForest(fol, data=trainingSet)
+rfPredictions <- predict(randomForestModel, newdata=testSet, type="class")
+sum(testSet$pop == rfPredictions)
+sum(testSet$pop == rfPredictions)/nrow(testSet)
+importance(randomForestModel)
+```
+
+# Predicting with support vector machines
+
+```{r predicting_with_svm, cache=TRUE}
+svmModel <- svm(fol, data=trainingSet)
+svmPredictions <- predict(svmModel, newdata=testSet, type="class")
+sum(testSet$pop == svmPredictions)
+sum(testSet$pop == svmPredictions)/nrow(testSet)
+```
+
+# Building confusion matrices
+
+```{r confusion_matrices, cache=TRUE}
+table(pred = dtPredictions, true = testSet$pop)
+table(pred = rfPredictions, true = testSet$pop)
+table(pred = svmPredictions, true = testSet$pop)
+```
+
+# plotting data to find out which one is broken
+
+```{r plots, cache=TRUE}
+qplot(chl_big, file_id, data = seaflow, color=pop)
+qplot(chl_small, file_id, data = seaflow, color=pop)
+qplot(pe, file_id, data = seaflow, color=pop)
+qplot(fsc_big, file_id, data = seaflow, color=pop)
+qplot(fsc_perp, file_id, data = seaflow, color=pop)
+qplot(fsc_small, file_id, data = seaflow, color=pop)
+```
+
+# Finding out a time series data error
+
+```{r, time_and_chl_big, cache=TRUE}
+qplot(time, chl_big, data = seaflow, color=pop)
+```
+
+# Removing data from the broken file
+
+```{r subsetting, cache=TRUE}
+cleaned <- subset(seaflow, file_id != 208)
+cleanedSamples <- createDataPartition(cleaned$file_id, 2)
+cleanedTrainingSet <- cleaned[cleanedSamples$Resample1,]
+cleanedTestSet <- cleaned[cleanedSamples$Resample2,]
+cleanedSvmModel <- svm(fol, data=cleanedTrainingSet)
+cleanedSvmPredictions <- predict(cleanedSvmModel, newdata=cleanedTestSet, type="class")
+```
+
+# Showing the prediction results
+
+```{r clean_prediction_results, cache=TRUE}
+c(nrow(cleanedTestSet),length(cleanedSvmPredictions))
+c(nrow(testSet),length(svmPredictions))
+sum(cleanedTestSet$pop == cleanedSvmPredictions)
+sum(cleanedTestSet$pop == cleanedSvmPredictions)/nrow(cleanedTestSet)
+sum(testSet$pop == svmPredictions)/nrow(testSet)
+sum(cleanedTestSet$pop == cleanedSvmPredictions)/nrow(cleanedTestSet) - sum(testSet$pop == svmPredictions)/nrow(testSet)
+```
